@@ -1,6 +1,5 @@
 extends CharacterBody2D
 
-
 @onready var anim_tree = $AnimationTree
 @onready var anim_state = anim_tree.get("parameters/playback")
 
@@ -16,13 +15,12 @@ var input_direction = Vector2(0, 0)
 var tile_moved = true # If player has just moved to a new tile
 var is_moving = false
 var percent_moved_to_next_tile = 0.0
-var walk_inv = false  #! Not working properly
+var walk_inv = false # ! Not working properly
 
 var socket
 var client_symbol
 var symbol
 var direction = Vector2.ZERO
-
 
 func _physics_process(delta):
 	if client_symbol == symbol:
@@ -32,15 +30,8 @@ func _physics_process(delta):
 			# Before server confirmation
 			if tile_moved:
 				tile_moved = false
-				if input_direction == Vector2(1, 0):
-					socket.send_text('r')
-				elif input_direction == Vector2(-1, 0):
-					socket.send_text('l')
-				elif input_direction == Vector2(0, 1):
-					socket.send_text('d')
-				elif input_direction == Vector2(0, -1):
-					socket.send_text('u')
-
+				var new_position = tile_position + input_direction
+				socket.send_text('p' + str(new_position.x) + ',' + str(new_position.y))
 			# After server confirmation
 			if direction != Vector2.ZERO:
 				move(delta)

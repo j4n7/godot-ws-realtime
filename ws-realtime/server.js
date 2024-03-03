@@ -12,12 +12,13 @@ let board = new Board(20, 15)
 // Update all clients with the current state of the board
 setInterval(() => {
     console.clear()
-    // board.moveEnemies()
     board.draw()
+
+    const playerPositions = board.exportPlayerPositions().join(':')
 
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(board.exportTiles())
+            client.send(playerPositions)
         }
     })
 }, 1000 / tps)
@@ -30,38 +31,28 @@ wss.on('connection', ws => {
         }
         console.clear()
         board.draw()
-
-        // wss.clients.forEach(client => {
-        //     if (client.readyState === WebSocket.OPEN) {
-        //         client.send(board.exportTiles())
-        //     }
-        // })
     })
 
     ws.on('message', message => {
         if (message.toString() === 'cc') {
             board.addPlayer()
             ws.symbol = board.activePlayerSymbols[board.activePlayerSymbols.length - 1]
-            ws.send('s' + ws.symbol)
+            ws.send('a' + ws.symbol)
             console.clear()
             board.draw()
-
-            // wss.clients.forEach(client => {
-            //     if (client.readyState === WebSocket.OPEN) {
-            //         client.send(board.exportTiles())
-            //     }
-            // })
-        } else {
-            console.log(message.toString())
-            board.movePlayer(ws.symbol, message.toString())
+        } else if (message.toString().startsWith('p')) {
+            const newPosition = parseCoordinates(message.toString())
+            board.movePlayer(ws.symbol, newPosition)
             console.clear()
             board.draw()
-    
-            // wss.clients.forEach(client => {
-            //     if (client.readyState === WebSocket.OPEN) {
-            //         client.send(board.exportTiles())
-            //     }
-            // })
         }
     })
 })
+
+function parseCoordinates(message) {
+    const parts = message.slice(1).split(',')
+    return {
+        x: parseInt(parts[0], 10),
+        y: parseInt(parts[1], 10)
+    }
+}

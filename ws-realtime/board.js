@@ -99,14 +99,29 @@ export class Board {
     return tilesString;
   }
 
+  exportPlayerPositions() {
+    const playerPositions = [];
+  
+    this.tiles.forEach((row, rowIndex) => {
+      row.forEach((tile, colIndex) => {
+        if (this.activePlayerSymbols.includes(tile)) {
+          const positionString = `s${tile};p${colIndex},${rowIndex}`;
+          playerPositions.push(positionString);
+        }
+      });
+    });
+  
+    return playerPositions;
+  }
+
   importTiles(tilesString) {
     const rows = tilesString.split("\n");
     this.tiles = rows.map((row) => row.split(""));
   }
 
-  movePlayer(symbol, direction) {
+  movePlayer(symbol, newPosition) {
     let i, j;
-
+  
     // Find the player on the board
     this.tiles.forEach((row, rowIndex) => {
       row.forEach((tile, colIndex) => {
@@ -116,43 +131,31 @@ export class Board {
         }
       });
     });
-
+  
     if (i === undefined || j === undefined) {
       console.log(`Player ${symbol} not found.`);
       return;
     }
-
-    let newI = i,
-      newJ = j;
-    switch (direction) {
-      case "u":
-        newI = i - 1;
-        break;
-      case "d":
-        newI = i + 1;
-        break;
-      case "l":
-        newJ = j - 1;
-        break;
-      case "r":
-        newJ = j + 1;
-        break;
-      default:
-        console.log(`Invalid direction ${direction}.`);
-        return;
-    }
-
-    // Check if the new position is a wall or another player
-    if (this.tiles[newI][newJ] === "*" || this.tiles[newI][newJ] !== " ") {
-      console.log(
-        `Player ${symbol} cannot move into a wall or another player.`
-      );
+  
+    // Calculate the distance to the new position
+    const distance = Math.abs(newPosition.y - i) + Math.abs(newPosition.x - j);
+  
+    // Check if the new position is valid
+    if (distance !== 1) {
+      console.log(`Player ${symbol} can only move 1 tile at a time.`);
       return;
     }
-
-    // Move the player
-    this.tiles[i][j] = " ";
-    this.tiles[newI][newJ] = symbol;
+  
+    // Check if the new position is a wall or another player
+    const tile = this.tiles[newPosition.y][newPosition.x];
+    if (tile === 'wall' || tile === 'player') {
+      console.log(`Player ${symbol} cannot move into a wall or another player.`);
+      return;
+    }
+  
+    // Move the player to the new position
+    this.tiles[i][j] = ' '; // Assuming ' ' represents an empty tile
+    this.tiles[newPosition.y][newPosition.x] = symbol;
   }
 
   addEnemies(n) {
