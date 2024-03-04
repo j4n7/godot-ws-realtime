@@ -417,3 +417,7 @@ anim_player = NodePath("../AnimationPlayer")
 parameters/Idle/blend_position = Vector2(-0.00105822, 0.594714)
 parameters/Walk/blend_position = Vector2(-0.132935, -0.365639)
 "parameters/Walk Inv/blend_position" = Vector2(-1.02222, -0.037037)
+
+[node name="RayCast2D" type="RayCast2D" parent="."]
+position = Vector2(8, 8)
+target_position = Vector2(0, 16)

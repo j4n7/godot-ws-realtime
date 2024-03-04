@@ -148,7 +148,7 @@ export class Board {
   
     // Check if the new position is a wall or another player
     const tile = this.tiles[newPosition.y][newPosition.x];
-    if (tile === 'wall' || tile === 'player') {
+    if (tile === '*' || tile !== " ") {
       console.log(`Player ${symbol} cannot move into a wall or another player.`);
       return;
     }

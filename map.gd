@@ -10,15 +10,13 @@ var client_symbol = ''
 var server_positions = {}
 var players = {}
 
-var scene = preload("res://player.tscn")
-
+var scene = preload ("res://player.tscn")
 
 func _ready():
 	socket.connect_to_url(url)
 
-
 func _process(delta):
-	socket.poll()  # Upadates connection state
+	socket.poll() # Upadates connection state
 	var state = socket.get_ready_state()
 	
 	if state == WebSocketPeer.STATE_OPEN:
@@ -27,7 +25,7 @@ func _process(delta):
 			socket.send_text('cc')
 			
 		# Listen
-		if socket.get_available_packet_count():  # Gets number of packets in buffer
+		if socket.get_available_packet_count(): # Gets number of packets in buffer
 			var message = socket.get_packet().get_string_from_utf8()
 			if message: # Message is empty if there are no players
 				if message[0] == 'a':
@@ -46,39 +44,34 @@ func _process(delta):
 		
 		socket.connect_to_url(url)
 
-func import_positions(positions_string):
-	# Split the string into an array of position strings
-	var position_strings = positions_string.split(":")
-	
-	# Clear the positions dictionary
-	server_positions.clear()
-	
-	# Iterate over each position string
-	for position_string in position_strings:
-		# Split the position string into symbol and position parts
+func import_positions(position_strings):
+	var positions = position_strings.split(":")
+	for position_string in positions:
 		var parts = position_string.split(";")
-		
-		# Extract the symbol
 		var symbol = parts[0].substr(1)
-		
-		# Extract the x and y coordinates
 		var coordinates = parts[1].substr(1).split(",")
+		var nInput = int(parts[2].substr(1))
 		var x = int(coordinates[0])
 		var y = int(coordinates[1])
-		
-		# Update the positions dictionary
-		server_positions[symbol] = Vector2(x, y)
+		var pos = Vector2(x, y)
+		if symbol in server_positions:
+			server_positions[symbol][nInput] = pos
+		else:
+			server_positions[symbol] = {nInput: pos}
 
 func players_from_positions():
 	for symbol in server_positions.keys():
-		var tile_pos = server_positions[symbol]
+		var keys = server_positions[symbol].keys()
+		keys.sort()
+		var last_key = keys[-1] # Get the last key
+		var tile_pos = server_positions[symbol][last_key]
 		var pos = tile_pos * TILE_SIZE
 
-		if players.has(symbol):  # If player exists
+		if players.has(symbol): # If player exists
 			var player = players[symbol]
 			if player.tile_position != tile_pos:
 				player.direction = tile_pos - player.tile_position
-		else:  # If player doesn't exist
+		else: # If player doesn't exist
 			var player = scene.instantiate()
 			player.position = pos
 			player.tile_position = tile_pos
@@ -87,4 +80,4 @@ func players_from_positions():
 			if player.client_symbol == player.symbol:
 				player.socket = socket
 			add_child(player)
-			players[symbol] = player  # Store the player using its symbol as the key
+			players[symbol] = player # Store the player using its symbol as the key
