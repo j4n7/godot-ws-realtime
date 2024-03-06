@@ -62,12 +62,14 @@ wss.on("connection", (ws) => {
       ws.symbol =
         board.activePlayerSymbols[board.activePlayerSymbols.length - 1];
       nInputs[ws.symbol] = 0;
-  
       simulateLatency(() => {
         ws.send("a" + ws.symbol);
+      }, smLatency / 2)();
+    } else if (message.toString().startsWith("i")) { // Ping
+      simulateLatency(() => {
+        ws.send(message.toString()); 
       }, smLatency / 2)(); // One-way latency - server is only sending data
-  
-    } else if (message.toString().startsWith("p")) {
+    } else if (message.toString().startsWith("p")) { // Position
       const newPosition = parseCoordinates(message.toString());
       nInputs[ws.symbol] = newPosition[0];
       board.movePlayer(ws.symbol, newPosition[1]);

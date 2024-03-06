@@ -1,9 +1,13 @@
 extends Node2D
 
 const TILE_SIZE = 16
+const PREDICTION = true
 
 var socket = WebSocketPeer.new()
 var url = 'ws://localhost:8080'
+
+var ping_start_time = 0
+var waiting_for_pong = false
 
 var client_connected = false
 var client_symbol = ''
@@ -13,27 +17,41 @@ var players = {}
 var scene = preload ("res://player.tscn")
 
 func _ready():
+	Engine.max_fps = 30
+	
 	socket.connect_to_url(url)
 
 func _process(delta):
+	$FPS.text = "FPS: " + str(Engine.get_frames_per_second())
+	
 	socket.poll() # Upadates connection state
 	var state = socket.get_ready_state()
 	
 	if state == WebSocketPeer.STATE_OPEN:
+
+		if !waiting_for_pong:
+			ping_start_time = Time.get_ticks_msec()
+			socket.send_text('i' + str(ping_start_time))
+			waiting_for_pong = true
+
 		if !client_connected:
 			client_connected = true
-			socket.send_text('cc')
+			socket.send_text('cc') # Connect client
 			
 		# Listen
-		if socket.get_available_packet_count(): # Gets number of packets in buffer
+		while socket.get_available_packet_count(): # Gets number of packets in buffer
 			var message = socket.get_packet().get_string_from_utf8()
 			if message: # Message is empty if there are no players
-				if message[0] == 'a':
+				if message[0] == 'i': # Pong
+					var ping_end_time = Time.get_ticks_msec()
+					var ping = ping_end_time - ping_start_time
+					$Lag.text = "Lag: " + str(ping) + " ms"
+					waiting_for_pong = false
+				elif message[0] == 'a': # Added client
 					client_symbol = message[1]
 				else:
-					import_positions(message)
+					parse_positions(message)
 					players_from_positions()
-			
 	elif state == WebSocketPeer.STATE_CLOSING:
 		pass
 	elif state == WebSocketPeer.STATE_CLOSED:
@@ -44,7 +62,7 @@ func _process(delta):
 		
 		socket.connect_to_url(url)
 
-func import_positions(position_strings):
+func parse_positions(position_strings):
 	var positions = position_strings.split(":")
 	for position_string in positions:
 		var parts = position_string.split(";")
@@ -64,17 +82,17 @@ func players_from_positions():
 		var keys = server_positions[symbol].keys()
 		keys.sort()
 		var last_key = keys[-1] # Get the last key
-		var tile_pos = server_positions[symbol][last_key]
-		var pos = tile_pos * TILE_SIZE
-
+		var tile_pos_server = server_positions[symbol][last_key]
+		var pos = tile_pos_server * TILE_SIZE
 		if players.has(symbol): # If player exists
 			var player = players[symbol]
-			if player.tile_position != tile_pos:
-				player.direction = tile_pos - player.tile_position
+			if player.tile_pos != tile_pos_server:
+				player.tile_pos_server = tile_pos_server
 		else: # If player doesn't exist
 			var player = scene.instantiate()
 			player.position = pos
-			player.tile_position = tile_pos
+			player.tile_pos = tile_pos_server
+			player.tile_pos_server = tile_pos_server
 			player.client_symbol = client_symbol
 			player.symbol = symbol
 			if player.client_symbol == player.symbol:
