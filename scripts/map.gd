@@ -1,8 +1,5 @@
 extends Node2D
 
-const TILE_SIZE = 16
-const PREDICTION = true
-
 var socket = WebSocketPeer.new()
 var url = 'ws://localhost:8080'
 
@@ -15,7 +12,7 @@ var players = {}
 var tile_pos_server_time = {} # Not used
 var tile_pos_server_inputs = {}
 
-var scene = preload ("res://player.tscn")
+var scene = preload ("res://scenes/player.tscn")
 
 func _ready():
 	Engine.max_fps = 30
@@ -79,8 +76,8 @@ func parse_positions(position_strings):
 			if symbol in tile_pos_server_inputs:
 				tile_pos_server_time[symbol][time] = pos
 				tile_pos_server_inputs[symbol][nInput] = pos
-				trim_dictionary(tile_pos_server_time[symbol], 3)
-				trim_dictionary(tile_pos_server_inputs[symbol], 3)
+				Utils.trim_dictionary(tile_pos_server_time[symbol], 3)
+				Utils.trim_dictionary(tile_pos_server_inputs[symbol], 3)
 			else:
 				tile_pos_server_time[symbol] = {time: pos}
 				tile_pos_server_inputs[symbol] = {nInput: pos}
@@ -90,7 +87,7 @@ func players_from_positions():
 		var keys = tile_pos_server_inputs[symbol].keys()
 		var last_key = keys[-1]
 		var tile_pos_server = tile_pos_server_inputs[symbol][last_key]
-		var pos = tile_pos_server * TILE_SIZE
+		var pos = tile_pos_server * Config.TILE_SIZE
 		if players.has(symbol): # If player exists
 			var player = players[symbol]
 			if player.tile_pos != tile_pos_server:
@@ -108,11 +105,3 @@ func players_from_positions():
 				player.socket = socket
 			add_child(player)
 			players[symbol] = player # Store the player using its symbol as the key
-
-func trim_dictionary(dict, n):
-	var keys = dict.keys()
-	while dict.size() > n:
-		var key_to_remove = keys[0]
-		dict.erase(key_to_remove)
-		keys.remove_at(0)
-	return dict

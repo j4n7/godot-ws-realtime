@@ -1,10 +1,10 @@
 [gd_scene load_steps=5 format=3 uid="uid://dcloieue15ep7"]
 
-[ext_resource type="Script" path="res://map.gd" id="1_7alua"]
-[ext_resource type="Texture2D" uid="uid://glbiir3sj6ga" path="res://assets/grid.png" id="2_wyxnr"]
+[ext_resource type="Script" path="res://scripts/map.gd" id="1_3kj4i"]
+[ext_resource type="Texture2D" uid="uid://glbiir3sj6ga" path="res://assets/grid.png" id="2_ml8th"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_xxjlh"]
-texture = ExtResource("2_wyxnr")
+texture = ExtResource("2_ml8th")
 0:0/0 = 0
 0:0/0/physics_layer_0/linear_velocity = Vector2(0, 0)
 0:0/0/physics_layer_0/angular_velocity = 0.0
@@ -30,7 +30,7 @@ physics_layer_0/collision_layer = 1
 sources/0 = SubResource("TileSetAtlasSource_xxjlh")
 
 [node name="Map" type="Node2D"]
-script = ExtResource("1_7alua")
+script = ExtResource("1_3kj4i")
 
 [node name="TileMap" type="TileMap" parent="."]
 tile_set = SubResource("TileSet_0lxgq")

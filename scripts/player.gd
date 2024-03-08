@@ -4,9 +4,6 @@ extends CharacterBody2D
 @onready var anim_state = anim_tree.get("parameters/playback")
 @onready var ray = $RayCast2D
 
-const TILE_SIZE = 16
-const PREDICTION = true
-
 var walk_speed = 5.0 # Number of tiles per second
 var percent_moved_to_next_tile = 0.0
 
@@ -31,7 +28,7 @@ func _physics_process(delta):
 		if not processing_move:
 			process_input('local')
 		elif processing_move:
-			if PREDICTION:
+			if Config.PREDICTION:
 				if tile_moved:
 					tile_moved = false
 					store_and_send_position()
@@ -65,7 +62,7 @@ func process_input(mode='local'):
 	# Check for collisions in all directions
 	collide_directions = []
 	for dir in directions:
-		var desired_step: Vector2 = dir * TILE_SIZE / 2
+		var desired_step: Vector2 = dir * Config.TILE_SIZE / 2
 		ray.target_position = desired_step
 		ray.force_raycast_update()
 		if ray.is_colliding():
@@ -85,27 +82,28 @@ func move(delta):
 	percent_moved_to_next_tile += walk_speed * delta
 	if percent_moved_to_next_tile >= 1.0:
 		percent_moved_to_next_tile = 0.0
-		position = tile_pos_pixels + (direction * TILE_SIZE)
-		tile_pos = position / TILE_SIZE
+		position = tile_pos_pixels + (direction * Config.TILE_SIZE)
+		tile_pos = position / Config.TILE_SIZE
 		tile_pos_server = tile_pos
 		collide_directions = []
 		processing_move = false
 		tile_moved = true
 	else:
-		position = tile_pos_pixels + (direction * TILE_SIZE * percent_moved_to_next_tile)
+		position = tile_pos_pixels + (direction * Config.TILE_SIZE * percent_moved_to_next_tile)
 	anim_state.travel("Walk")
 
 func move_instant():
-	position = tile_pos_pixels + (direction * TILE_SIZE)
-	tile_pos = position / TILE_SIZE
+	position = tile_pos_pixels + (direction * Config.TILE_SIZE)
+	tile_pos = position / Config.TILE_SIZE
 	tile_pos_server = tile_pos
 	collide_directions = []
 	processing_move = false
 	tile_moved = true
 
-func store_and_send_position():
+func store_and_send_position(max_size=1):
 	var new_tile_pos = tile_pos + direction
 	var keys = tile_pos_inputs.keys()
 	var n = keys[- 1] + 1 if keys else 1
 	tile_pos_inputs[n] = new_tile_pos
 	socket.send_text('p' + str(n) + '-' + str(new_tile_pos.x) + ',' + str(new_tile_pos.y))
+	Utils.trim_dictionary(tile_pos_inputs, max_size)
