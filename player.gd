@@ -13,25 +13,24 @@ var percent_moved_to_next_tile = 0.0
 var tile_pos = Vector2i.ZERO
 var tile_pos_pixels = Vector2.ZERO
 var tile_pos_server = Vector2.ZERO
+var tile_pos_inputs = {}
 
 var direction = Vector2.ZERO
 var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
 var collide_directions = []
 
-var process_move = false
+var processing_move = false
 var tile_moved = true
 
 var socket
 var client_symbol
 var symbol
 
-var ball_positions = {} # Local
-
 func _physics_process(delta):
 	if client_symbol == symbol:
-		if not process_move:
+		if not processing_move:
 			process_input('local')
-		elif process_move:
+		elif processing_move:
 			if PREDICTION:
 				if tile_moved:
 					tile_moved = false
@@ -46,12 +45,10 @@ func _physics_process(delta):
 				if tile_pos_server - tile_pos != Vector2.ZERO:
 					move(delta)
 	else:
-		if not process_move:
+		if not processing_move:
 			process_input('remote')
-		elif direction != Vector2.ZERO:
+		elif processing_move:
 			move(delta)
-		else:
-			process_move = false
 
 func process_input(mode='local'):
 	if mode == 'local':
@@ -60,13 +57,15 @@ func process_input(mode='local'):
 		if direction.x == 0:
 			direction.y = int(Input.is_action_pressed("ui_down")) - int(Input.is_action_pressed("ui_up"))
 	elif mode == 'remote':
-		direction = tile_pos_server - tile_pos
+		if not tile_pos_inputs.is_empty():
+			var key = tile_pos_inputs.keys()[0]
+			direction = tile_pos_inputs[key] - tile_pos
+			tile_pos_inputs.erase(key)
 
-	#? Check for collisions in all directions
-	#? Movement is handled differently than in a popular GB game
+	# Check for collisions in all directions
 	collide_directions = []
 	for dir in directions:
-		var desired_step : Vector2 = dir * TILE_SIZE / 2
+		var desired_step: Vector2 = dir * TILE_SIZE / 2
 		ray.target_position = desired_step
 		ray.force_raycast_update()
 		if ray.is_colliding():
@@ -74,7 +73,7 @@ func process_input(mode='local'):
 
 	if direction != Vector2.ZERO and direction not in collide_directions:
 		tile_pos_pixels = position
-		process_move = true
+		processing_move = true
 
 		anim_tree.set("parameters/Idle/blend_position", direction)
 		anim_tree.set("parameters/Walk/blend_position", direction)
@@ -87,17 +86,26 @@ func move(delta):
 	if percent_moved_to_next_tile >= 1.0:
 		percent_moved_to_next_tile = 0.0
 		position = tile_pos_pixels + (direction * TILE_SIZE)
-		tile_pos = (position / TILE_SIZE).floor()
+		tile_pos = position / TILE_SIZE
 		tile_pos_server = tile_pos
 		collide_directions = []
-		process_move = false
+		processing_move = false
 		tile_moved = true
 	else:
 		position = tile_pos_pixels + (direction * TILE_SIZE * percent_moved_to_next_tile)
 	anim_state.travel("Walk")
 
+func move_instant():
+	position = tile_pos_pixels + (direction * TILE_SIZE)
+	tile_pos = position / TILE_SIZE
+	tile_pos_server = tile_pos
+	collide_directions = []
+	processing_move = false
+	tile_moved = true
+
 func store_and_send_position():
 	var new_tile_pos = tile_pos + direction
-	var n = str(ball_positions.size() + 1) # Get the next key for the dictionary
-	ball_positions[n] = new_tile_pos
-	socket.send_text('p' + n + ';' + str(new_tile_pos.x) + ',' + str(new_tile_pos.y))
+	var keys = tile_pos_inputs.keys()
+	var n = keys[- 1] + 1 if keys else 1
+	tile_pos_inputs[n] = new_tile_pos
+	socket.send_text('p' + str(n) + '-' + str(new_tile_pos.x) + ',' + str(new_tile_pos.y))

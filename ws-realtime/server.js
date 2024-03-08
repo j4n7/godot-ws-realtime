@@ -32,14 +32,17 @@ let display = () => {
 // Update all clients with the current state of the board
 setInterval(() => {
   const playerPositions = board.exportPlayerPositions().map(playerString => {
-    const symbol = playerString.split(';')[0].slice(1); // Extract the symbol from the string
-    return `${playerString};n${nInputs[symbol]}`;
-  }).join(":");
+    const symbol = playerString.split('-')[0]; // Extract the symbol from the string
+    return `${nInputs[symbol]}-${playerString}`;
+  }).join("|");
+
+  const timestamp = Date.now();
+  const message = `${timestamp}|${playerPositions}`;
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       simulateLatency(() => {
-        client.send(playerPositions);
+        client.send(message);
       }, smLatency / 2)(); // One-way latency - server is only sending data
     }
   });
@@ -78,7 +81,7 @@ wss.on("connection", (ws) => {
 });
 
 function parseCoordinates(message) {
-  const parts = message.slice(1).split(";");
+  const parts = message.slice(1).split("-");
   const nInput = parts[0];
   const coordinates = parts[1].split(",");
   return [

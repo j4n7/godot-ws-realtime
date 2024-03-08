@@ -105,7 +105,7 @@ export class Board {
     this.tiles.forEach((row, rowIndex) => {
       row.forEach((tile, colIndex) => {
         if (this.activePlayerSymbols.includes(tile)) {
-          const positionString = `s${tile};p${colIndex},${rowIndex}`;
+          const positionString = `${tile}-${colIndex},${rowIndex}`;
           playerPositions.push(positionString);
         }
       });
