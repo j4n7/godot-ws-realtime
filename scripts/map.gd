@@ -90,7 +90,7 @@ func players_from_positions():
 		var tile_pos_pixels = tile_pos_server * Config.TILE_SIZE
 		if players.has(symbol): # If player exists
 			var player = players[symbol]
-			if player.tile_pos != tile_pos_server:
+			if player.client_symbol != player.symbol and player.tile_pos != tile_pos_server:
 				player.tile_pos_inputs[last_key] = tile_pos_server
 		else: # If player doesn't exist
 			var player = scene.instantiate()

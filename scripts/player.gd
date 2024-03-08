@@ -16,7 +16,7 @@ var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
 var collide_directions = []
 
 var processing_move = false
-var tile_moved = true
+var tile_completed = true
 
 var socket
 var client_symbol
@@ -27,19 +27,11 @@ func _physics_process(delta):
 		if not processing_move:
 			process_input('local')
 		elif processing_move:
-			if Config.PREDICTION:
-				if tile_moved:
-					tile_moved = false
-					store_and_send_position()
+			if tile_completed:
+				tile_completed = false
+				store_and_send_position()
+			else: #? This else seems important to reduce lag
 				move(delta)
-			else:
-				# Before server confirmation
-				if tile_moved:
-					tile_moved = false
-					store_and_send_position()
-				# After server confirmation
-				else:
-					move(delta)
 	else:
 		if not processing_move:
 			process_input('remote')
@@ -58,16 +50,7 @@ func process_input(mode='local'):
 			direction = tile_pos_inputs[key] - tile_pos
 			tile_pos_inputs.erase(key)
 
-	# Check for collisions in all directions
-	collide_directions = []
-	for dir in directions:
-		var desired_step: Vector2 = dir * Config.TILE_SIZE / 2
-		ray.target_position = desired_step
-		ray.force_raycast_update()
-		if ray.is_colliding():
-			collide_directions.append(dir)
-
-	if direction != Vector2.ZERO and direction not in collide_directions:
+	if direction != Vector2.ZERO and not will_collide(direction):
 		tile_pos_pixels = position
 		processing_move = true
 
@@ -85,7 +68,7 @@ func move(delta):
 		tile_pos = position / Config.TILE_SIZE
 		collide_directions = []
 		processing_move = false
-		tile_moved = true
+		tile_completed = true
 	else:
 		position = tile_pos_pixels + (direction * Config.TILE_SIZE * percent_moved_to_next_tile)
 	anim_state.travel("Walk")
@@ -95,7 +78,7 @@ func move_instant():
 	tile_pos = position / Config.TILE_SIZE
 	collide_directions = []
 	processing_move = false
-	tile_moved = true
+	tile_completed = true
 
 func store_and_send_position(max_size=1):
 	var new_tile_pos = tile_pos + direction
@@ -104,3 +87,16 @@ func store_and_send_position(max_size=1):
 	tile_pos_inputs[n] = new_tile_pos
 	socket.send_text('p' + str(n) + '-' + str(new_tile_pos.x) + ',' + str(new_tile_pos.y))
 	Utils.trim_dictionary(tile_pos_inputs, max_size)
+
+func will_collide(dir):
+	# Check for collisions in all directions
+	collide_directions = []
+	for dir_ in directions:
+		var desired_step: Vector2 = dir_ * Config.TILE_SIZE / 2
+		ray.target_position = desired_step
+		ray.force_raycast_update()
+		if ray.is_colliding():
+			collide_directions.append(dir_)
+	if dir in collide_directions:
+		return true
+	return false

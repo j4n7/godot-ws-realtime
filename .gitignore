@@ -2,3 +2,5 @@
 .godot/
 assets/gameboy_rpg_v09.*
 video/
+*.bk
+*cfg
