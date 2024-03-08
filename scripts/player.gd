@@ -9,7 +9,6 @@ var percent_moved_to_next_tile = 0.0
 
 var tile_pos = Vector2i.ZERO
 var tile_pos_pixels = Vector2.ZERO
-var tile_pos_server = Vector2.ZERO
 var tile_pos_inputs = {}
 
 var direction = Vector2.ZERO
@@ -39,7 +38,7 @@ func _physics_process(delta):
 					tile_moved = false
 					store_and_send_position()
 				# After server confirmation
-				if tile_pos_server - tile_pos != Vector2.ZERO:
+				else:
 					move(delta)
 	else:
 		if not processing_move:
@@ -84,7 +83,6 @@ func move(delta):
 		percent_moved_to_next_tile = 0.0
 		position = tile_pos_pixels + (direction * Config.TILE_SIZE)
 		tile_pos = position / Config.TILE_SIZE
-		tile_pos_server = tile_pos
 		collide_directions = []
 		processing_move = false
 		tile_moved = true
@@ -95,7 +93,6 @@ func move(delta):
 func move_instant():
 	position = tile_pos_pixels + (direction * Config.TILE_SIZE)
 	tile_pos = position / Config.TILE_SIZE
-	tile_pos_server = tile_pos
 	collide_directions = []
 	processing_move = false
 	tile_moved = true

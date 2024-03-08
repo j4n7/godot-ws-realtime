@@ -72,33 +72,30 @@ func parse_positions(position_strings):
 			var coordinates = parts[2].split(",")
 			var x = int(coordinates[0])
 			var y = int(coordinates[1])
-			var pos = Vector2(x, y)
+			var tile_pos = Vector2(x, y)
 			if symbol in tile_pos_server_inputs:
-				tile_pos_server_time[symbol][time] = pos
-				tile_pos_server_inputs[symbol][nInput] = pos
+				tile_pos_server_time[symbol][time] = tile_pos
+				tile_pos_server_inputs[symbol][nInput] = tile_pos
 				Utils.trim_dictionary(tile_pos_server_time[symbol], 3)
 				Utils.trim_dictionary(tile_pos_server_inputs[symbol], 3)
 			else:
-				tile_pos_server_time[symbol] = {time: pos}
-				tile_pos_server_inputs[symbol] = {nInput: pos}
+				tile_pos_server_time[symbol] = {time: tile_pos}
+				tile_pos_server_inputs[symbol] = {nInput: tile_pos}
 
 func players_from_positions():
 	for symbol in tile_pos_server_inputs.keys():
 		var keys = tile_pos_server_inputs[symbol].keys()
 		var last_key = keys[-1]
 		var tile_pos_server = tile_pos_server_inputs[symbol][last_key]
-		var pos = tile_pos_server * Config.TILE_SIZE
+		var tile_pos_pixels = tile_pos_server * Config.TILE_SIZE
 		if players.has(symbol): # If player exists
 			var player = players[symbol]
 			if player.tile_pos != tile_pos_server:
 				player.tile_pos_inputs[last_key] = tile_pos_server
-				 #? Maybe this can be implemented using the above logic
-				player.tile_pos_server = tile_pos_server
 		else: # If player doesn't exist
 			var player = scene.instantiate()
-			player.position = pos
+			player.position = tile_pos_pixels
 			player.tile_pos = tile_pos_server
-			player.tile_pos_server = tile_pos_server
 			player.client_symbol = client_symbol
 			player.symbol = symbol
 			if player.client_symbol == player.symbol:
