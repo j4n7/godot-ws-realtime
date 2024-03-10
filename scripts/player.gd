@@ -14,7 +14,6 @@ var tile_pos_inps_srv = {}
 
 var direction = Vector2.ZERO
 var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
-var collide_directions = []
 
 var last_recon_input = -1
 var needs_correction
@@ -72,22 +71,26 @@ func process_input(mode='local'):
 		anim_state.travel("Idle")
 
 func move(delta):
-	percent_moved_to_next_tile += walk_speed * delta
-	if percent_moved_to_next_tile >= 1.0:
+	if not will_collide(direction):
+		percent_moved_to_next_tile += walk_speed * delta
+		if percent_moved_to_next_tile >= 1.0:
+			percent_moved_to_next_tile = 0.0
+			position = tile_pos_pxls + (direction * Config.TILE_SIZE)
+			tile_pos = position / Config.TILE_SIZE
+			processing_move = false
+			tile_completed = true
+		else:
+			position = tile_pos_pxls + (direction * Config.TILE_SIZE * percent_moved_to_next_tile)
+		anim_state.travel("Walk")
+	else:
 		percent_moved_to_next_tile = 0.0
-		position = tile_pos_pxls + (direction * Config.TILE_SIZE)
-		tile_pos = position / Config.TILE_SIZE
-		collide_directions = []
+		position = tile_pos * Config.TILE_SIZE
 		processing_move = false
 		tile_completed = true
-	else:
-		position = tile_pos_pxls + (direction * Config.TILE_SIZE * percent_moved_to_next_tile)
-	anim_state.travel("Walk")
 
 func move_instant():
 	position = tile_pos_pxls + (direction * Config.TILE_SIZE)
 	tile_pos = position / Config.TILE_SIZE
-	collide_directions = []
 	processing_move = false
 	tile_completed = true
 
@@ -108,15 +111,12 @@ func store_and_send_position():
 
 func will_collide(dir):
 	# Check for collisions in all directions
-	collide_directions = []
 	for dir_ in directions:
 		var desired_step: Vector2 = dir_ * Config.TILE_SIZE / 2
 		ray.target_position = desired_step
 		ray.force_raycast_update()
-		if ray.is_colliding():
-			collide_directions.append(dir_)
-	if dir in collide_directions:
-		return true
+		if ray.is_colliding() and dir_ == dir:
+			return true
 	return false
 
 func reconciliate_pos():
