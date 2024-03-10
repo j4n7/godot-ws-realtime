@@ -9,8 +9,8 @@ var waiting_for_pong = false
 var client_connected = false
 var client_symbol = ''
 var players = {}
-var tile_pos_server_time = {} # Not used
-var tile_pos_server_inputs = {}
+var tile_pos_srv_time = {} # Not used
+var tile_pos_inps_srv = {}
 
 var scene = preload ("res://scenes/player.tscn")
 
@@ -55,7 +55,7 @@ func _process(delta):
 	elif state == WebSocketPeer.STATE_CLOSED:
 		client_connected = false
 		client_symbol = ''
-		tile_pos_server_inputs = {}
+		tile_pos_inps_srv = {}
 		players = {}
 		
 		socket.connect_to_url(url)
@@ -73,29 +73,28 @@ func parse_positions(position_strings):
 			var x = int(coordinates[0])
 			var y = int(coordinates[1])
 			var tile_pos = Vector2(x, y)
-			if symbol in tile_pos_server_inputs:
-				tile_pos_server_time[symbol][time] = tile_pos
-				tile_pos_server_inputs[symbol][nInput] = tile_pos
-				Utils.trim_dictionary(tile_pos_server_time[symbol], 3)
-				Utils.trim_dictionary(tile_pos_server_inputs[symbol], 3)
+			if symbol in tile_pos_inps_srv:
+				# tile_pos_srv_time[symbol][time] = tile_pos
+				tile_pos_inps_srv[symbol][nInput] = tile_pos
 			else:
-				tile_pos_server_time[symbol] = {time: tile_pos}
-				tile_pos_server_inputs[symbol] = {nInput: tile_pos}
+				# tile_pos_srv_time[symbol] = {time: tile_pos}
+				tile_pos_inps_srv[symbol] = {nInput: tile_pos}
 
 func players_from_positions():
-	for symbol in tile_pos_server_inputs.keys():
-		var keys = tile_pos_server_inputs[symbol].keys()
+	for symbol in tile_pos_inps_srv.keys():
+		var keys = tile_pos_inps_srv[symbol].keys()
 		var last_key = keys[-1]
-		var tile_pos_server = tile_pos_server_inputs[symbol][last_key]
-		var tile_pos_pixels = tile_pos_server * Config.TILE_SIZE
+		var tile_pos_srv = tile_pos_inps_srv[symbol][last_key]
+		var tile_pos_pxls = tile_pos_srv * Config.TILE_SIZE
 		if players.has(symbol): # If player exists
 			var player = players[symbol]
-			if player.client_symbol != player.symbol and player.tile_pos != tile_pos_server:
-				player.tile_pos_inputs[last_key] = tile_pos_server
+			player.tile_pos_inps_srv[last_key] = tile_pos_srv
+			tile_pos_inps_srv[symbol].erase(last_key)
 		else: # If player doesn't exist
 			var player = scene.instantiate()
-			player.position = tile_pos_pixels
-			player.tile_pos = tile_pos_server
+			player.position = tile_pos_pxls
+			player.tile_pos = tile_pos_srv
+			player.tile_pos_inps_cln[last_key] = tile_pos_srv
 			player.client_symbol = client_symbol
 			player.symbol = symbol
 			if player.client_symbol == player.symbol:

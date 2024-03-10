@@ -4,10 +4,10 @@ import { Board } from "./board.js";
 let smLatency = process.argv[2] ? parseInt(process.argv[2]) : 0
 const tps = 20; // Ticks per second
 const serverDisplay = true; // Display the server's board in the console
-
+const debugPos = false;
 
 const wss = new WebSocketServer({ port: "8080" });
-let nInputs = {};
+let lastPlayerInput = {};
 
 let board = new Board(20, 15);
 
@@ -33,7 +33,7 @@ let display = () => {
 setInterval(() => {
   const playerPositions = board.exportPlayerPositions().map(playerString => {
     const symbol = playerString.split('-')[0]; // Extract the symbol from the string
-    return `${nInputs[symbol]}-${playerString}`;
+    return `${lastPlayerInput[symbol]}-${playerString}`;
   }).join("|");
 
   const timestamp = Date.now();
@@ -55,7 +55,7 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     if (ws.symbol !== undefined) {
       board.deletePlayer(ws.symbol);
-      delete nInputs[ws.symbol];
+      delete lastPlayerInput[ws.symbol];
     }
   });
 
@@ -64,7 +64,7 @@ wss.on("connection", (ws) => {
       board.addPlayer();
       ws.symbol =
         board.activePlayerSymbols[board.activePlayerSymbols.length - 1];
-      nInputs[ws.symbol] = 0;
+      lastPlayerInput[ws.symbol] = 0;
       simulateLatency(() => {
         ws.send("a" + ws.symbol);
       }, smLatency / 2)();
@@ -74,8 +74,11 @@ wss.on("connection", (ws) => {
       }, smLatency / 2)(); // One-way latency - server is only sending data
     } else if (message.toString().startsWith("p")) { // Position
       const newPosition = parseCoordinates(message.toString());
-      nInputs[ws.symbol] = newPosition[0];
+      lastPlayerInput[ws.symbol] = newPosition[0];
       board.movePlayer(ws.symbol, newPosition[1]);
+      if (debugPos) {
+        console.log('In server: ', lastPlayerInput);
+      }
     }
   }, smLatency / 2)); // One-way latency - server is only receiving data
 });
