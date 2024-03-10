@@ -81,7 +81,11 @@ func parse_positions(position_strings):
 				tile_pos_inps_srv[symbol] = {nInput: tile_pos}
 
 func players_from_positions():
+	var symbols_to_remove = []
 	for symbol in tile_pos_inps_srv.keys():
+		if not tile_pos_inps_srv[symbol]: # If player has disconnected
+			symbols_to_remove.append(symbol)
+			continue
 		var keys = tile_pos_inps_srv[symbol].keys()
 		var last_key = keys[-1]
 		var tile_pos_srv = tile_pos_inps_srv[symbol][last_key]
@@ -101,3 +105,7 @@ func players_from_positions():
 				player.socket = socket
 			add_child(player)
 			players[symbol] = player # Store the player using its symbol as the key
+	for symbol in symbols_to_remove: # Delete disconnected players
+		tile_pos_inps_srv.erase(symbol)
+		players[symbol].queue_free()
+		players.erase(symbol)
