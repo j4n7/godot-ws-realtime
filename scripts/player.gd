@@ -5,7 +5,7 @@ extends CharacterBody2D
 @onready var ray = $RayCast2D
 
 var walk_speed = 5.0 # Number of tiles per second
-var percent_moved_to_next_tile = 0.0
+var percent_moved = 0.0
 
 var tile_pos = Vector2i.ZERO
 var tile_pos_pxls = Vector2.ZERO
@@ -24,13 +24,20 @@ var tile_completed = true
 var socket
 var client_symbol
 var symbol
+var owner_
+
+func _ready():
+	if client_symbol == symbol:
+		owner_ = 'local'
+	else:
+		owner_ = 'remote'
 
 func _physics_process(delta):
-	if client_symbol == symbol:
+	if owner_ == 'local':
 		if not processing_move:
 			needs_correction = reconciliate_pos()
 			if not needs_correction:
-				process_input('local')
+				process_input()
 			else:
 				move_correct()
 			if tile_pos_inps_cln.has(last_recon_input):
@@ -42,19 +49,19 @@ func _physics_process(delta):
 				store_and_send_position()
 			else: #? This else seems important to reduce lag
 				move(delta)
-	else:
+	elif owner_ == 'remote':
 		if not processing_move:
-			process_input('remote')
+			process_input()
 		elif processing_move:
 			move(delta)
 
-func process_input(mode='local'):
-	if mode == 'local':
+func process_input():
+	if owner_ == 'local':
 		if direction.y == 0:
 			direction.x = int(Input.is_action_pressed("ui_right")) - int(Input.is_action_pressed("ui_left"))
 		if direction.x == 0:
 			direction.y = int(Input.is_action_pressed("ui_down")) - int(Input.is_action_pressed("ui_up"))
-	elif mode == 'remote':
+	elif owner_ == 'remote':
 		if not tile_pos_inps_srv.is_empty():
 			var key = tile_pos_inps_srv.keys()[0]
 			direction = tile_pos_inps_srv[key] - tile_pos
@@ -71,22 +78,23 @@ func process_input(mode='local'):
 		anim_state.travel("Idle")
 
 func move(delta):
-	if not will_collide(direction):
-		percent_moved_to_next_tile += walk_speed * delta
-		if percent_moved_to_next_tile >= 1.0:
-			percent_moved_to_next_tile = 0.0
+	if not will_collide(direction) or owner_ == 'remote':
+		percent_moved += walk_speed * delta
+		if percent_moved >= 1.0:
+			percent_moved = 0.0
 			position = tile_pos_pxls + (direction * Config.TILE_SIZE)
 			tile_pos = position / Config.TILE_SIZE
 			processing_move = false
 			tile_completed = true
 		else:
-			position = tile_pos_pxls + (direction * Config.TILE_SIZE * percent_moved_to_next_tile)
+			position = tile_pos_pxls + (direction * Config.TILE_SIZE * percent_moved)
 		anim_state.travel("Walk")
 	else:
-		percent_moved_to_next_tile = 0.0
+		percent_moved = 0.0
 		position = tile_pos * Config.TILE_SIZE
 		processing_move = false
 		tile_completed = true
+		tile_pos_inps_cln[last_recon_input + 1] = tile_pos
 
 func move_instant():
 	position = tile_pos_pxls + (direction * Config.TILE_SIZE)
