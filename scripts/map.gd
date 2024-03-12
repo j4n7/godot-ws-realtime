@@ -1,7 +1,8 @@
 extends Node2D
 
+@onready var url = 'ws://' + Utils.get_server_adress()
+
 var socket = WebSocketPeer.new()
-var url
 
 var ping_t0_time = 0
 var waiting_for_pong = false
@@ -16,8 +17,7 @@ var scene = preload ("res://scenes/player.tscn")
 
 func _ready():
 	Engine.max_fps = 30
-	
-	url = 'ws://' + Utils.get_server_adress()
+
 	socket.connect_to_url(url)
 
 func _process(delta):

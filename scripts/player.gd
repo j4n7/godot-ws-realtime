@@ -6,20 +6,17 @@ extends CharacterBody2D
 
 var walk_speed = 5.0 # Number of tiles per second
 var percent_moved = 0.0
+var processing_move = false
+var tile_completed = true
+var direction = Vector2.ZERO
 
 var tile_pos = Vector2i.ZERO
 var tile_pos_pxls = Vector2.ZERO
 var tile_pos_inps_cln = {}
 var tile_pos_inps_srv = {}
 
-var direction = Vector2.ZERO
-var directions = [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]
-
 var last_recon_input = -1
 var needs_correction
-
-var processing_move = false
-var tile_completed = true
 
 var socket
 var client_symbol
@@ -117,14 +114,11 @@ func store_and_send_position():
 	if Config.DEBUG_POS:
 		print(client_symbol, ' Pending: ', tile_pos_inps_cln)
 
-func will_collide(dir):
-	# Check for collisions in all directions
-	for dir_ in directions:
-		var desired_step: Vector2 = dir_ * Config.TILE_SIZE / 2
-		ray.target_position = desired_step
-		ray.force_raycast_update()
-		if ray.is_colliding() and dir_ == dir:
-			return true
+func will_collide(target_dir):
+	ray.target_position = target_dir * Config.TILE_SIZE / 2
+	ray.force_raycast_update()
+	if ray.is_colliding():
+		return true
 	return false
 
 func reconciliate_pos():
