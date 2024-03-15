@@ -77,7 +77,7 @@ wss.on("connection", (ws) => {
       lastPlayerInput[ws.symbol] = newPosition[0];
       board.movePlayer(ws.symbol, newPosition[1]);
       if (debugPos) {
-        console.log('In server: ', lastPlayerInput);
+        console.log('In server:', newPosition[0], newPosition[1]);
       }
     }
   }, smLatency / 2)); // One-way latency - server is only receiving data

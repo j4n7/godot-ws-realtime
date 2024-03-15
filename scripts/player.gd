@@ -4,7 +4,7 @@ extends CharacterBody2D
 @onready var anim_state = anim_tree.get("parameters/playback")
 @onready var ray = $RayCast2D
 
-var walk_speed = 5.0 # Number of tiles per second
+var move_speed = 200 # ms per tile
 var percent_moved = 0.0
 var processing_move = false
 var tile_completed = true
@@ -12,8 +12,8 @@ var direction = Vector2.ZERO
 
 var tile_pos = Vector2i.ZERO
 var tile_pos_pxls = Vector2.ZERO
-var tile_pos_inps_cln = {}
-var tile_pos_inps_srv = {}
+var tile_pos_inps_cln = {} # Buffer
+var tile_pos_inps_srv = {} # Buffer
 
 var last_recon_input = -1
 var needs_correction
@@ -32,14 +32,8 @@ func _ready():
 func _physics_process(delta):
 	if owner_ == 'local':
 		if not processing_move:
-			needs_correction = reconciliate_pos()
-			if not needs_correction:
-				process_input()
-			else:
-				move_correct()
-			if tile_pos_inps_cln.has(last_recon_input):
-				tile_pos_inps_cln.erase(last_recon_input)
-			tile_pos_inps_srv.erase(last_recon_input)
+			reconciliate_pos()
+			process_input()
 		elif processing_move:
 			if tile_completed:
 				tile_completed = false
@@ -64,7 +58,7 @@ func process_input():
 			direction = tile_pos_inps_srv[key] - tile_pos
 			tile_pos_inps_srv.erase(key)
 
-	if direction != Vector2.ZERO and not will_collide(direction):
+	if direction != Vector2.ZERO and (not will_collide(direction) or owner_ == 'remote'):
 		tile_pos_pxls = position
 		processing_move = true
 
@@ -76,7 +70,7 @@ func process_input():
 
 func move(delta):
 	if not will_collide(direction) or owner_ == 'remote':
-		percent_moved += walk_speed * delta
+		percent_moved += (1000 / move_speed) * delta
 		if percent_moved >= 1.0:
 			percent_moved = 0.0
 			position = tile_pos_pxls + (direction * Config.TILE_SIZE)
@@ -91,28 +85,29 @@ func move(delta):
 		position = tile_pos * Config.TILE_SIZE
 		processing_move = false
 		tile_completed = true
-		tile_pos_inps_cln[last_recon_input + 1] = tile_pos
 
-func move_instant():
-	position = tile_pos_pxls + (direction * Config.TILE_SIZE)
-	tile_pos = position / Config.TILE_SIZE
-	processing_move = false
-	tile_completed = true
-
-func move_correct():
-	var key = tile_pos_inps_srv.keys()[0]
-	var tile_pos_srv = tile_pos_inps_srv[key]
-	tile_pos_inps_cln[key] = tile_pos_srv
-	position = tile_pos_srv * Config.TILE_SIZE
-	tile_pos = tile_pos_srv
+		var last_key = tile_pos_inps_cln.keys()[-1]
+		tile_pos_inps_cln[last_key] = tile_pos
+		if Config.DEBUG_POS:
+			print(client_symbol, ' Corrected (client): ', tile_pos_inps_cln)
 
 func store_and_send_position():
+	# n = 0 is spawn position
+	var n
+	# No more inputs to reconcile
+	if tile_pos_inps_cln.is_empty():
+		n = last_recon_input + 1
+	# There are still inputs to reconcile
+	else:
+		var last_key = tile_pos_inps_cln.keys()[-1]
+		n = last_key + 1
+
 	var new_tile_pos = tile_pos + direction
-	var n = last_recon_input + 1
+	
 	tile_pos_inps_cln[n] = new_tile_pos
 	socket.send_text('p' + str(n) + '-' + str(new_tile_pos.x) + ',' + str(new_tile_pos.y))
 	if Config.DEBUG_POS:
-		print(client_symbol, ' Pending: ', tile_pos_inps_cln)
+		print(client_symbol, ' Sent: ', tile_pos_inps_cln)
 
 func will_collide(target_dir):
 	ray.target_position = target_dir * Config.TILE_SIZE / 2
@@ -122,15 +117,24 @@ func will_collide(target_dir):
 	return false
 
 func reconciliate_pos():
-	var result = false
-	if tile_pos_inps_srv.size() == 1:
-		var key = tile_pos_inps_srv.keys()[0]
-		if key > last_recon_input:
-			last_recon_input = key
-			if tile_pos_inps_cln.has(key) and tile_pos_inps_cln[key] != tile_pos_inps_srv[key]:
-				result = true
+	var inputs_to_erase = []
+	for input in tile_pos_inps_srv:
+		if input > last_recon_input:
+			last_recon_input = input
+			if tile_pos_inps_cln.has(input) and tile_pos_inps_cln[input] != tile_pos_inps_srv[input]:
+				# Tile correction
+				position = tile_pos_inps_srv[input] * Config.TILE_SIZE
+				tile_pos = tile_pos_inps_srv[input]
+				if Config.DEBUG_POS:
+					print(client_symbol, ' Corrected (server): ', {input: tile_pos_inps_srv[input]})
 			if Config.DEBUG_POS:
-				print(client_symbol, ' Server: ', tile_pos_inps_srv)
-				print(client_symbol, ' Client: ', tile_pos_inps_cln)
-				print(client_symbol, ' Reconciliated: ', key)
-	return result
+				print(client_symbol, ' Reconciled: ', input)
+		inputs_to_erase.append(input)
+
+	if not inputs_to_erase.is_empty():
+		#? Why is this necessary?
+		tile_pos_inps_cln = tile_pos_inps_cln.duplicate()
+
+		for input in inputs_to_erase:
+			tile_pos_inps_cln.erase(input)
+			tile_pos_inps_srv.erase(input)

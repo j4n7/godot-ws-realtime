@@ -10,8 +10,8 @@ var waiting_for_pong = false
 var client_connected = false
 var client_symbol = ''
 var players = {}
-var tile_pos_srv_time = {} # Not used
-var tile_pos_inps_srv = {}
+var tile_pos_time_srv = {} # Not used
+var tile_pos_inps_srv = {} # Only stores last position for each player
 
 var scene = preload ("res://scenes/player.tscn")
 
@@ -63,7 +63,7 @@ func _process(delta):
 
 func parse_positions(position_strings):
 	var positions = position_strings.split("|")
-	var time = int(positions[0])
+	# var time = int(positions[0])
 	if positions[1]:
 		for i in range(1, len(positions)):
 			var position_string = positions[i]
@@ -74,12 +74,7 @@ func parse_positions(position_strings):
 			var x = int(coordinates[0])
 			var y = int(coordinates[1])
 			var tile_pos = Vector2(x, y)
-			if symbol in tile_pos_inps_srv:
-				# tile_pos_srv_time[symbol][time] = tile_pos
-				tile_pos_inps_srv[symbol][nInput] = tile_pos
-			else:
-				# tile_pos_srv_time[symbol] = {time: tile_pos}
-				tile_pos_inps_srv[symbol] = {nInput: tile_pos}
+			tile_pos_inps_srv[symbol] = {nInput: tile_pos}
 
 func players_from_positions():
 	var symbols_to_remove = []
@@ -87,19 +82,17 @@ func players_from_positions():
 		if not tile_pos_inps_srv[symbol]: # If player has disconnected
 			symbols_to_remove.append(symbol)
 			continue
-		var keys = tile_pos_inps_srv[symbol].keys()
-		var last_key = keys[-1]
-		var tile_pos_srv = tile_pos_inps_srv[symbol][last_key]
-		var tile_pos_pxls = tile_pos_srv * Config.TILE_SIZE
+		var input = tile_pos_inps_srv[symbol].keys()[0]
+		var tile_pos_srv = tile_pos_inps_srv[symbol][input]
 		if players.has(symbol): # If player exists
 			var player = players[symbol]
-			player.tile_pos_inps_srv[last_key] = tile_pos_srv
-			tile_pos_inps_srv[symbol].erase(last_key)
+			player.tile_pos_inps_srv[input] = tile_pos_srv
 		else: # If player doesn't exist
 			var player = scene.instantiate()
-			player.position = tile_pos_pxls
+			player.position = tile_pos_srv * Config.TILE_SIZE
 			player.tile_pos = tile_pos_srv
-			player.tile_pos_inps_cln[last_key] = tile_pos_srv
+			player.tile_pos_inps_cln = tile_pos_inps_srv[symbol]
+			player.tile_pos_inps_srv = tile_pos_inps_srv[symbol]
 			player.client_symbol = client_symbol
 			player.symbol = symbol
 			if player.client_symbol == player.symbol:
