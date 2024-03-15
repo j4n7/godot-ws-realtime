@@ -69,7 +69,7 @@ func process_input():
 		anim_state.travel("Idle")
 
 func move(delta):
-	if not will_collide(direction) or owner_ == 'remote':
+	if not will_collide(direction) or owner_ == 'remote' or not Config.COLLISION_PREDICTION:
 		percent_moved += (1000 / move_speed) * delta
 		if percent_moved >= 1.0:
 			percent_moved = 0.0
