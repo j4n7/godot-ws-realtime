@@ -5,6 +5,7 @@ let smLatency = process.argv[2] ? parseInt(process.argv[2]) : 0
 const tps = 20; // Ticks per second
 const serverDisplay = true; // Display the server's board in the console
 const debugPos = false;
+const debugMsg = false;
 
 const wss = new WebSocketServer({ port: "8080" });
 let lastPlayerInput = {};
@@ -27,17 +28,23 @@ let display = () => {
   }
 }
 
-// board.addEnemies(3)
+board.addEnemies(3)
 
 // Update all clients with the current state of the board
 setInterval(() => {
+  board.moveEnemies();
   const playerPositions = board.exportPlayerPositions().map(playerString => {
-    const symbol = playerString.split('-')[0]; // Extract the symbol from the string
-    return `${lastPlayerInput[symbol]}-${playerString}`;
+    const id = playerString.split('-')[0];
+    const position = playerString.split('-')[1];
+    return `${id}-${lastPlayerInput[id]}-${position}`;
   }).join("|");
 
+  const enemyPositions = board.exportEnemyPositions().map(enemyString => {
+    return enemyString;
+  }).join("|");    
+
   const timestamp = Date.now();
-  const message = `${timestamp}|${playerPositions}`;
+  const message = `${timestamp}=p|${playerPositions}=e|${enemyPositions}`;
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
@@ -47,26 +54,27 @@ setInterval(() => {
     }
   });
   
- display();
+  display();
+  if (debugMsg) {
+    console.log('Sent:', message);
+  }
 
 }, 1000 / tps);
 
 wss.on("connection", (ws) => {
   ws.on("close", () => {
-    if (ws.symbol !== undefined) {
-      board.deletePlayer(ws.symbol);
-      delete lastPlayerInput[ws.symbol];
+    if (ws.id !== undefined) {
+      board.deletePlayer(ws.id);
+      delete lastPlayerInput[ws.id];
     }
   });
 
   ws.on("message", simulateLatency((message) => {
     if (message.toString() === "cc") {
-      board.addPlayer();
-      ws.symbol =
-        board.activePlayerSymbols[board.activePlayerSymbols.length - 1];
-      lastPlayerInput[ws.symbol] = 0;
+      ws.id = board.addPlayer();
+      lastPlayerInput[ws.id] = 0;
       simulateLatency(() => {
-        ws.send("a" + ws.symbol);
+        ws.send("a" + ws.id);
       }, smLatency / 2)();
     } else if (message.toString().startsWith("i")) { // Ping
       simulateLatency(() => {
@@ -74,8 +82,8 @@ wss.on("connection", (ws) => {
       }, smLatency / 2)(); // One-way latency - server is only sending data
     } else if (message.toString().startsWith("p")) { // Position
       const newPosition = parseCoordinates(message.toString());
-      lastPlayerInput[ws.symbol] = newPosition[0];
-      board.movePlayer(ws.symbol, newPosition[1]);
+      lastPlayerInput[ws.id] = newPosition[0];
+      board.movePlayer(ws.id, newPosition[1]);
       if (debugPos) {
         console.log('In server:', newPosition[0], newPosition[1]);
       }
@@ -86,7 +94,7 @@ wss.on("connection", (ws) => {
 function parseCoordinates(message) {
   const parts = message.slice(1).split("-");
   const nInput = parts[0];
-  const coordinates = parts[1].split(",");
+  const coordinates = parts[1].split("·");
   return [
     parseInt(nInput, 10),
     { x: parseInt(coordinates[0], 10), y: parseInt(coordinates[1], 10) },

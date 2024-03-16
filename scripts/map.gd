@@ -8,7 +8,7 @@ var ping_t0_time = 0
 var waiting_for_pong = false
 
 var client_connected = false
-var client_symbol = ''
+var client_id = ''
 var players = {}
 var tile_pos_time_srv = {} # Only stores one position for snapshot and player
 
@@ -46,7 +46,7 @@ func _process(delta):
 					$Lag.text = "Lag: " + str(ping) + " ms"
 					waiting_for_pong = false
 				elif message[0] == 'a': # Added client
-					client_symbol = message[1]
+					client_id = message.substr(1)
 				else:
 					parse_positions(message)
 					players_from_positions()
@@ -54,29 +54,44 @@ func _process(delta):
 		pass
 	elif state == WebSocketPeer.STATE_CLOSED:
 		client_connected = false
-		client_symbol = ''
+		client_id = ''
 		tile_pos_time_srv = {}
 		players = {}
 		
 		socket.connect_to_url(url)
 
 func parse_positions(position_strings):
-	var positions = position_strings.split("|")
+	var positions = position_strings.split("=")
 	var time = int(positions[0])
-	var snapshot = {}
-	if positions[1]:
-		for i in range(1, len(positions)):
-			var position_string = positions[i]
-			var parts = position_string.split("-")
-			var nInput = int(parts[0])
-			var symbol = parts[1]
-			var coordinates = parts[2].split(",")
+	var player_info = positions[1].split("|").slice(1)
+	var enemy_info = positions[2].split("|").slice(1)
+	var snapshot = {'players': {}, 'enemies': {}}
+
+	for player in player_info:
+		if player:
+			var info = player.split("-")
+			var id = int(info[0])
+			var n_input = int(info[1])
+			var coordinates = info[2].split("·")
 			var x = int(coordinates[0])
 			var y = int(coordinates[1])
 			var tile_pos = Vector2(x, y)
-			snapshot[symbol] = {nInput: tile_pos}
-	tile_pos_time_srv[time] = snapshot
+			snapshot['players'][id] = {n_input: tile_pos}
+	
+	for enemy in enemy_info:
+		if enemy:
+			var info = enemy.split("-")
+			var id = int(info[0])
+			var type = int(info[1])
+			var coordinates = info[2].split("·")
+			var x = int(coordinates[0])
+			var y = int(coordinates[1])
+			var tile_pos = Vector2(x, y)
+			snapshot['enemies'][id] = {type: tile_pos}
+
+	tile_pos_time_srv[time] = snapshot['players']
 	Utils.trim_buffer(tile_pos_time_srv, Config.SNAPSHOT_BUFFER)
+
 
 func players_from_positions():
 	var time = tile_pos_time_srv.keys()[0]
@@ -84,35 +99,35 @@ func players_from_positions():
 	var time_ftr = tile_pos_time_srv.keys()[-1]
 	var snapshot_ftr = tile_pos_time_srv[time_ftr]
 
-	var symbols_to_remove = []
-	for symbol in snapshot.keys():
-		if snapshot[symbol].is_empty(): # If player has disconnected
-			symbols_to_remove.append(symbol)
+	var ids_to_remove = []
+	for id in snapshot.keys():
+		if snapshot[id].is_empty(): # If player has disconnected
+			ids_to_remove.append(id)
 			continue
 
-		var input = snapshot[symbol].keys()[0]
-		var tile_pos_srv = snapshot[symbol][input]
-		var input_ftr = snapshot_ftr[symbol].keys()[0]
-		var tile_pos_srv_ftr = snapshot_ftr[symbol][input_ftr]
+		var input = snapshot[id].keys()[0]
+		var tile_pos_srv = snapshot[id][input]
+		var input_ftr = snapshot_ftr[id].keys()[0]
+		var tile_pos_srv_ftr = snapshot_ftr[id][input_ftr]
 
-		if players.has(symbol): # If player exists
-			var player = players[symbol]
+		if players.has(id): # If player exists
+			var player = players[id]
 			player.tile_pos_inps_srv[input] = tile_pos_srv
 			player.tile_pos_inps_srv_ftr[input_ftr] = tile_pos_srv_ftr
 		else: # If player doesn't exist
 			var player = scene.instantiate()
 			player.position = tile_pos_srv * Config.TILE_SIZE
 			player.tile_pos = tile_pos_srv
-			player.tile_pos_inps_cln = snapshot[symbol]
-			player.tile_pos_inps_srv = snapshot[symbol]
-			player.tile_pos_inps_srv_ftr = snapshot_ftr[symbol]
-			player.client_symbol = client_symbol
-			player.symbol = symbol
-			if player.client_symbol == player.symbol:
+			player.tile_pos_inps_cln = snapshot[id]
+			player.tile_pos_inps_srv = snapshot[id]
+			player.tile_pos_inps_srv_ftr = snapshot_ftr[id]
+			player.client_id = int(client_id)
+			player.id = int(id)
+			if player.client_id == player.id:
 				player.socket = socket
 			add_child(player)
-			players[symbol] = player # Store the player using its symbol as the key
-	for symbol in symbols_to_remove: # Delete disconnected players
-		snapshot.erase(symbol)
-		players[symbol].queue_free()
-		players.erase(symbol)
+			players[id] = player # Store the player using its id as the key
+	for id in ids_to_remove: # Delete disconnected players
+		snapshot.erase(id)
+		players[id].queue_free()
+		players.erase(id)

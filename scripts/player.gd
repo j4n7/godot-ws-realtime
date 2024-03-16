@@ -23,12 +23,12 @@ var last_recon_input = -1
 var needs_correction
 
 var socket
-var client_symbol
-var symbol
+var client_id
+var id
 var owner_
 
 func _ready():
-	if client_symbol == symbol:
+	if client_id == id:
 		owner_ = 'local'
 	else:
 		owner_ = 'remote'
@@ -131,7 +131,7 @@ func move(delta):
 		var last_key = tile_pos_inps_cln.keys()[- 1]
 		tile_pos_inps_cln[last_key] = tile_pos
 		if Config.DEBUG_POS:
-			print(client_symbol, ' Corrected (client): ', tile_pos_inps_cln)
+			print(client_id, ' Corrected (client): ', tile_pos_inps_cln)
 
 func store_and_send_position():
 	# n = 0 is spawn position
@@ -147,9 +147,9 @@ func store_and_send_position():
 	var new_tile_pos = tile_pos + direction
 	
 	tile_pos_inps_cln[n] = new_tile_pos
-	socket.send_text('p' + str(n) + '-' + str(new_tile_pos.x) + ',' + str(new_tile_pos.y))
+	socket.send_text('p' + str(n) + '-' + str(new_tile_pos.x) + '·' + str(new_tile_pos.y))
 	if Config.DEBUG_POS:
-		print(client_symbol, ' Sent: ', tile_pos_inps_cln)
+		print(client_id, ' Sent: ', tile_pos_inps_cln)
 
 func will_collide(target_dir):
 	ray.target_position = target_dir * Config.TILE_SIZE / 2
@@ -168,9 +168,9 @@ func reconciliate_pos():
 				position = tile_pos_inps_srv[input] * Config.TILE_SIZE
 				tile_pos = tile_pos_inps_srv[input]
 				if Config.DEBUG_POS:
-					print(client_symbol, ' Corrected (server): ', {input: tile_pos_inps_srv[input]})
+					print(client_id, ' Corrected (server): ', {input: tile_pos_inps_srv[input]})
 			if Config.DEBUG_POS:
-				print(client_symbol, ' Reconciled: ', input)
+				print(client_id, ' Reconciled: ', input)
 		inputs_to_erase.append(input)
 
 	#? This can probably be optimized using a while loop
