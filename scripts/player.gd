@@ -4,7 +4,7 @@ extends CharacterBody2D
 @onready var anim_state = anim_tree.get('parameters/playback')
 @onready var ray = $RayCast2D
 
-var move_speed = 200 # ms per tile
+var move_speed = 250 # ms per tile
 var percent_moved = 0.0
 var processing_move = false
 var tile_completed = true
@@ -57,9 +57,9 @@ func process_input():
 			direction.y = int(Input.is_action_pressed('ui_down')) - int(Input.is_action_pressed('ui_up'))
 	elif owner_ == 'remote':
 		if not tile_pos_inps_srv.is_empty():
-			var key = tile_pos_inps_srv.keys()[0]
+			var key = tile_pos_inps_srv.keys()[-1]
 			direction = tile_pos_inps_srv[key] - tile_pos
-			tile_pos_inps_srv.erase(key)
+			tile_pos_inps_srv = {}
 
 	# While pressing key, this is true
 	if direction != Vector2.ZERO and (not will_collide(direction) or owner_ == 'remote'):
@@ -70,6 +70,8 @@ func process_input():
 		anim_tree.set('parameters/Walk/blend_position', direction)
 		anim_tree.set('parameters/Walk Inv/blend_position', direction)
 	else:
+		# if owner_ == 'remote':
+		# 	print(client_symbol, symbol, Utils.random_int(), tile_pos_inps_srv)
 		anim_state.travel('Idle')
 		if not just_stop:
 			just_stop = true
@@ -143,6 +145,7 @@ func reconciliate_pos():
 				print(client_symbol, ' Reconciled: ', input)
 		inputs_to_erase.append(input)
 
+	#? This can probably be optimized using a while loop
 	if not inputs_to_erase.is_empty():
 		#? Why is this necessary?
 		tile_pos_inps_cln = tile_pos_inps_cln.duplicate()
