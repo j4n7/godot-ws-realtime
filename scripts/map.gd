@@ -10,7 +10,7 @@ var waiting_for_pong = false
 var client_connected = false
 var client_symbol = ''
 var players = {}
-var tile_pos_time_srv = {}
+var tile_pos_time_srv = {} # Only stores one position for snapshot and player
 
 var scene = preload ("res://scenes/player.tscn")
 
@@ -81,22 +81,31 @@ func parse_positions(position_strings):
 func players_from_positions():
 	var time = tile_pos_time_srv.keys()[0]
 	var snapshot = tile_pos_time_srv[time]
+	var time_ftr = tile_pos_time_srv.keys()[-1]
+	var snapshot_ftr = tile_pos_time_srv[time_ftr]
+
 	var symbols_to_remove = []
 	for symbol in snapshot.keys():
 		if snapshot[symbol].is_empty(): # If player has disconnected
 			symbols_to_remove.append(symbol)
 			continue
+
 		var input = snapshot[symbol].keys()[0]
 		var tile_pos_srv = snapshot[symbol][input]
+		var input_ftr = snapshot_ftr[symbol].keys()[0]
+		var tile_pos_srv_ftr = snapshot_ftr[symbol][input_ftr]
+
 		if players.has(symbol): # If player exists
 			var player = players[symbol]
 			player.tile_pos_inps_srv[input] = tile_pos_srv
+			player.tile_pos_inps_srv_ftr[input_ftr] = tile_pos_srv_ftr
 		else: # If player doesn't exist
 			var player = scene.instantiate()
 			player.position = tile_pos_srv * Config.TILE_SIZE
 			player.tile_pos = tile_pos_srv
 			player.tile_pos_inps_cln = snapshot[symbol]
 			player.tile_pos_inps_srv = snapshot[symbol]
+			player.tile_pos_inps_srv_ftr = snapshot_ftr[symbol]
 			player.client_symbol = client_symbol
 			player.symbol = symbol
 			if player.client_symbol == player.symbol:

@@ -17,6 +17,7 @@ var tile_pos = Vector2i.ZERO
 var tile_pos_pxls = Vector2.ZERO
 var tile_pos_inps_cln = {} # Buffer
 var tile_pos_inps_srv = {} # Buffer
+var tile_pos_inps_srv_ftr = {}
 
 var last_recon_input = -1
 var needs_correction
@@ -36,7 +37,7 @@ func _physics_process(delta):
 	if owner_ == 'local':
 		if not processing_move:
 			reconciliate_pos()
-			process_input()
+			process_input_cln()
 		elif processing_move:
 			if tile_completed:
 				tile_completed = false
@@ -45,37 +46,64 @@ func _physics_process(delta):
 				move(delta)
 	elif owner_ == 'remote':
 		if not processing_move:
-			process_input()
+			process_input_srv()
 		elif processing_move:
 			move(delta)
 
-func process_input():
-	if owner_ == 'local':
-		if direction.y == 0:
-			direction.x = int(Input.is_action_pressed('ui_right')) - int(Input.is_action_pressed('ui_left'))
-		if direction.x == 0:
-			direction.y = int(Input.is_action_pressed('ui_down')) - int(Input.is_action_pressed('ui_up'))
-	elif owner_ == 'remote':
-		if not tile_pos_inps_srv.is_empty():
-			var key = tile_pos_inps_srv.keys()[-1]
-			direction = tile_pos_inps_srv[key] - tile_pos
-			tile_pos_inps_srv = {}
+func set_anim_dir(dir):
+	anim_tree.set('parameters/Idle/blend_position', dir)
+	anim_tree.set('parameters/Walk/blend_position', dir)
+	anim_tree.set('parameters/Walk Inv/blend_position', dir)
+
+func set_starting_foot():
+	if not just_stop:
+		just_stop = true
+		walk_inv = not walk_inv
+
+func process_input_cln():
+	if direction.y == 0:
+		direction.x = int(Input.is_action_pressed('ui_right')) - int(Input.is_action_pressed('ui_left'))
+	if direction.x == 0:
+		direction.y = int(Input.is_action_pressed('ui_down')) - int(Input.is_action_pressed('ui_up'))
 
 	# While pressing key, this is true
-	if direction != Vector2.ZERO and (not will_collide(direction) or owner_ == 'remote'):
+	if direction != Vector2.ZERO and not will_collide(direction):
 		tile_pos_pxls = position
 		processing_move = true
-
-		anim_tree.set('parameters/Idle/blend_position', direction)
-		anim_tree.set('parameters/Walk/blend_position', direction)
-		anim_tree.set('parameters/Walk Inv/blend_position', direction)
+		set_anim_dir(direction)
 	else:
-		# if owner_ == 'remote':
-		# 	print(client_symbol, symbol, Utils.random_int(), tile_pos_inps_srv)
 		anim_state.travel('Idle')
-		if not just_stop:
-			just_stop = true
-			walk_inv = not walk_inv
+		set_starting_foot()
+
+func process_input_srv():
+	# If a new input arrives while player is still moving, it will not be processed
+	# In that case, input buffer will contain at least 2 inputs: current one and next one
+	# It can contain: 0, 1 or 2 inputs (maybe more if lag is too high)
+
+	var keep_moving
+	if not tile_pos_inps_srv.is_empty():
+		var input_2nd = tile_pos_inps_srv.keys()[-1]
+		var tile_pos_srv_2nd = tile_pos_inps_srv[input_2nd]
+		direction = tile_pos_srv_2nd - tile_pos
+
+		var input_1st = tile_pos_inps_srv.keys()[0]
+		var tile_pos_srv_1st = tile_pos_inps_srv[input_1st]
+		var input_ftr = tile_pos_inps_srv_ftr.keys()[-1]
+		var tile_pos_srv_ftr = tile_pos_inps_srv_ftr[input_ftr]
+		keep_moving = true if tile_pos_srv_ftr - tile_pos_srv_1st != Vector2.ZERO else false
+
+		tile_pos_inps_srv = {}
+		tile_pos_inps_srv_ftr = {}
+
+	if direction != Vector2.ZERO:
+		tile_pos_pxls = position
+		processing_move = true
+		set_anim_dir(direction)
+	elif keep_moving:
+		pass
+	else:
+		anim_state.travel('Idle')
+		set_starting_foot()
 
 func move(delta):
 	just_stop = false
