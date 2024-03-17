@@ -82,14 +82,19 @@ func process_srv_inpt():
 
 	var keep_moving
 	if not srv_inpt_pos.is_empty():
-		var inpt_2nd = srv_inpt_pos.keys()[-1]
+		var inpts = Utils.get_sorted_keys(srv_inpt_pos)
+
+		var inpt_2nd = inpts[-1]
 		var srv_pos_2nd = srv_inpt_pos[inpt_2nd]
 		direction = srv_pos_2nd - tile_pos
 
-		var inpt_1st = srv_inpt_pos.keys()[0]
+		var inpt_1st = inpts[0]
 		var srv_pos_1st = srv_inpt_pos[inpt_1st]
-		var input_ftr = srv_inpt_pos_ftr.keys()[-1]
-		var srv_pos_ftr = srv_inpt_pos_ftr[input_ftr]
+
+		var inpts_ftr = Utils.get_sorted_keys(srv_inpt_pos_ftr)
+
+		var inpt_ftr = inpts_ftr[-1]
+		var srv_pos_ftr = srv_inpt_pos_ftr[inpt_ftr]
 		keep_moving = true if srv_pos_ftr - srv_pos_1st != Vector2.ZERO else false
 
 		srv_inpt_pos = {}
@@ -128,8 +133,9 @@ func move(delta):
 		processing_move = false
 		tile_completed = true
 
-		var last_key = cln_inpt_pos.keys()[- 1]
-		cln_inpt_pos[last_key] = tile_pos
+		var inpts = Utils.get_sorted_keys(cln_inpt_pos)
+		var last_intp = inpts[-1]
+		cln_inpt_pos[last_intp] = tile_pos
 		if Config.DEBUG_POS:
 			print(client_id, ' Corrected (client): ', cln_inpt_pos)
 
@@ -141,8 +147,9 @@ func store_and_send_pos():
 		n = last_recon_input + 1
 	# There are still inputs to reconcile
 	else:
-		var last_key = cln_inpt_pos.keys()[- 1]
-		n = last_key + 1
+		var inpts = Utils.get_sorted_keys(cln_inpt_pos)
+		var last_intp = inpts[-1]		
+		n = last_intp + 1
 
 	var new_tile_pos = tile_pos + direction
 	

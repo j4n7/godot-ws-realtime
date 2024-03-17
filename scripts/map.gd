@@ -99,24 +99,29 @@ func parse_message(message):
 
 
 func players_from_snaps():
-	var time = srv_snapshots.keys()[0]
-	var snapshot = srv_snapshots[time]
-	var enem_snap = snapshot['players']
+	var times = Utils.get_sorted_keys(srv_snapshots)
 
-	var time_ftr = srv_snapshots.keys()[-1]
+	var time = times[0]
+	var snapshot = srv_snapshots[time]
+	var play_snap = snapshot['players']
+
+	var time_ftr = times[-1]
 	var snapshot_ftr = srv_snapshots[time_ftr]
-	var enem_snap_ftr = snapshot_ftr['players']
+	var play_snap_ftr = snapshot_ftr['players']
 
 	var ids_to_remove = []
-	for id in enem_snap.keys():
-		if enem_snap[id].is_empty(): # If player has disconnected
+	for id in play_snap.keys():
+		if play_snap[id].is_empty(): # If player has disconnected
 			ids_to_remove.append(id)
 			continue
+		
+		var inpts = Utils.get_sorted_keys(play_snap[id])
+		var inpt = inpts[0]
+		var srv_pos = play_snap[id][inpt]
 
-		var inpt = enem_snap[id].keys()[0]
-		var srv_pos = enem_snap[id][inpt]
-		var inpt_ftr = enem_snap_ftr[id].keys()[0]
-		var srv_pos_ftr = enem_snap_ftr[id][inpt_ftr]
+		var inpts_ftr = Utils.get_sorted_keys(play_snap_ftr[id])
+		var inpt_ftr = inpts_ftr[0]
+		var srv_pos_ftr = play_snap_ftr[id][inpt_ftr]
 
 		if players.has(id): # If player exists
 			var player = players[id]
@@ -131,23 +136,25 @@ func players_from_snaps():
 			player.position = srv_pos * Config.TILE_SIZE
 			player.tile_pos = srv_pos
 
-			player.cln_inpt_pos = enem_snap[id]
-			player.srv_inpt_pos = enem_snap[id]
-			player.srv_inpt_pos_ftr = enem_snap_ftr[id]
+			player.cln_inpt_pos = play_snap[id]
+			player.srv_inpt_pos = play_snap[id]
+			player.srv_inpt_pos_ftr = play_snap_ftr[id]
 
 			add_child(player)
 			players[id] = player # Store the player using its id as the key
 	for id in ids_to_remove: # Delete disconnected players
-		enem_snap.erase(id)
+		play_snap.erase(id)
 		players[id].queue_free()
 		players.erase(id)
 
 func enemies_from_snaps():
-	var time = srv_snapshots.keys()[0]
+	var times = Utils.get_sorted_keys(srv_snapshots)
+
+	var time = times[0]
 	var snapshot = srv_snapshots[time]
 	var enem_snap = snapshot['enemies']
 
-	var time_ftr = srv_snapshots.keys()[-1]
+	var time_ftr = times[-1]
 	var snapshot_ftr = srv_snapshots[time_ftr]
 	var enem_snap_ftr = snapshot_ftr['enemies']
 
@@ -157,9 +164,12 @@ func enemies_from_snaps():
 			ids_to_remove.append(id)
 			continue
 
-		var n = enem_snap[id].keys()[0]
+		var n_moves = Utils.get_sorted_keys(enem_snap[id])
+		var n = n_moves[0]
 		var srv_pos = enem_snap[id][n]
-		var n_ftr = enem_snap_ftr[id].keys()[0]
+
+		var n_moves_ftr = Utils.get_sorted_keys(enem_snap_ftr[id])
+		var n_ftr = n_moves_ftr[0]
 		var srv_pos_ftr = enem_snap_ftr[id][n_ftr]
 
 		if enemies.has(id): # If enemy exists
