@@ -9,10 +9,13 @@ var waiting_for_pong = false
 
 var client_connected = false
 var client_id = ''
-var players = {}
-var tile_pos_time_srv = {} # Only stores one position for snapshot and player
+var srv_snapshots = {} # Only stores one position per snapshot
 
-var scene = preload ("res://scenes/player.tscn")
+var players = {}
+var enemies = {}
+
+var scene_player = preload("res://scenes/player.tscn")
+var scene_enemy = preload("res://scenes/enemy.tscn")
 
 func _ready():
 	Engine.max_fps = 30
@@ -48,23 +51,25 @@ func _process(delta):
 				elif message[0] == 'a': # Added client
 					client_id = message.substr(1)
 				else:
-					parse_positions(message)
-					players_from_positions()
+					parse_message(message)
+					enemies_from_snaps()
+					players_from_snaps()
 	elif state == WebSocketPeer.STATE_CLOSING:
 		pass
 	elif state == WebSocketPeer.STATE_CLOSED:
 		client_connected = false
 		client_id = ''
-		tile_pos_time_srv = {}
+		srv_snapshots = {}
 		players = {}
+		enemies = {}
 		
 		socket.connect_to_url(url)
 
-func parse_positions(position_strings):
-	var positions = position_strings.split("=")
-	var time = int(positions[0])
-	var player_info = positions[1].split("|").slice(1)
-	var enemy_info = positions[2].split("|").slice(1)
+func parse_message(message):
+	var parts = message.split("=")
+	var time = int(parts[0])
+	var player_info = parts[1].split("|").slice(1)
+	var enemy_info = parts[2].split("|").slice(1)
 	var snapshot = {'players': {}, 'enemies': {}}
 
 	for player in player_info:
@@ -89,45 +94,93 @@ func parse_positions(position_strings):
 			var tile_pos = Vector2(x, y)
 			snapshot['enemies'][id] = {type: tile_pos}
 
-	tile_pos_time_srv[time] = snapshot['players']
-	Utils.trim_buffer(tile_pos_time_srv, Config.SNAPSHOT_BUFFER)
+	srv_snapshots[time] = snapshot
+	Utils.trim_buffer(srv_snapshots, Config.SNAPSHOT_BUFFER)
 
 
-func players_from_positions():
-	var time = tile_pos_time_srv.keys()[0]
-	var snapshot = tile_pos_time_srv[time]
-	var time_ftr = tile_pos_time_srv.keys()[-1]
-	var snapshot_ftr = tile_pos_time_srv[time_ftr]
+func players_from_snaps():
+	var time = srv_snapshots.keys()[0]
+	var snapshot = srv_snapshots[time]
+	var enem_snap = snapshot['players']
+
+	var time_ftr = srv_snapshots.keys()[-1]
+	var snapshot_ftr = srv_snapshots[time_ftr]
+	var enem_snap_ftr = snapshot_ftr['players']
 
 	var ids_to_remove = []
-	for id in snapshot.keys():
-		if snapshot[id].is_empty(): # If player has disconnected
+	for id in enem_snap.keys():
+		if enem_snap[id].is_empty(): # If player has disconnected
 			ids_to_remove.append(id)
 			continue
 
-		var input = snapshot[id].keys()[0]
-		var tile_pos_srv = snapshot[id][input]
-		var input_ftr = snapshot_ftr[id].keys()[0]
-		var tile_pos_srv_ftr = snapshot_ftr[id][input_ftr]
+		var inpt = enem_snap[id].keys()[0]
+		var srv_pos = enem_snap[id][inpt]
+		var inpt_ftr = enem_snap_ftr[id].keys()[0]
+		var srv_pos_ftr = enem_snap_ftr[id][inpt_ftr]
 
 		if players.has(id): # If player exists
 			var player = players[id]
-			player.tile_pos_inps_srv[input] = tile_pos_srv
-			player.tile_pos_inps_srv_ftr[input_ftr] = tile_pos_srv_ftr
+			player.srv_inpt_pos[inpt] = srv_pos
+			player.srv_inpt_pos_ftr[inpt_ftr] = srv_pos_ftr
 		else: # If player doesn't exist
-			var player = scene.instantiate()
-			player.position = tile_pos_srv * Config.TILE_SIZE
-			player.tile_pos = tile_pos_srv
-			player.tile_pos_inps_cln = snapshot[id]
-			player.tile_pos_inps_srv = snapshot[id]
-			player.tile_pos_inps_srv_ftr = snapshot_ftr[id]
+			var player = scene_player.instantiate()
+			player.socket = socket if player.client_id == player.id else null
 			player.client_id = int(client_id)
 			player.id = int(id)
-			if player.client_id == player.id:
-				player.socket = socket
+
+			player.position = srv_pos * Config.TILE_SIZE
+			player.tile_pos = srv_pos
+
+			player.cln_inpt_pos = enem_snap[id]
+			player.srv_inpt_pos = enem_snap[id]
+			player.srv_inpt_pos_ftr = enem_snap_ftr[id]
+
 			add_child(player)
 			players[id] = player # Store the player using its id as the key
 	for id in ids_to_remove: # Delete disconnected players
-		snapshot.erase(id)
+		enem_snap.erase(id)
 		players[id].queue_free()
 		players.erase(id)
+
+func enemies_from_snaps():
+	var time = srv_snapshots.keys()[0]
+	var snapshot = srv_snapshots[time]
+	var enem_snap = snapshot['enemies']
+
+	var time_ftr = srv_snapshots.keys()[-1]
+	var snapshot_ftr = srv_snapshots[time_ftr]
+	var enem_snap_ftr = snapshot_ftr['enemies']
+
+	var ids_to_remove = []
+	for id in enem_snap.keys():
+		if enem_snap[id].is_empty():
+			ids_to_remove.append(id)
+			continue
+
+		var n = enem_snap[id].keys()[0]
+		var srv_pos = enem_snap[id][n]
+		var n_ftr = enem_snap_ftr[id].keys()[0]
+		var srv_pos_ftr = enem_snap_ftr[id][n_ftr]
+
+		if enemies.has(id): # If enemy exists
+			var enemy = enemies[id]
+			enemy.srv_n_pos[n] = srv_pos
+			enemy.srv_n_pos_ftr[n_ftr] = srv_pos_ftr
+		else: # If enemy doesn't exist
+			var enemy = scene_enemy.instantiate()
+
+			enemy.client_id = int(client_id)
+			enemy.id = int(id)
+
+			enemy.position = srv_pos * Config.TILE_SIZE
+			enemy.tile_pos = srv_pos
+
+			enemy.srv_n_pos = enem_snap[id]
+			enemy.srv_n_pos_ftr = enem_snap_ftr[id]
+
+			add_child(enemy)
+			enemies[id] = enemy # Store the enemy using its id as the key
+	for id in ids_to_remove: # Delete disconnected enemies
+		enem_snap.erase(id)
+		enemies[id].queue_free()
+		enemies.erase(id)

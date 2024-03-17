@@ -7,8 +7,11 @@ const serverDisplay = true; // Display the server's board in the console
 const debugPos = false;
 const debugMsg = false;
 
+let lastTick = -1;
+
 const wss = new WebSocketServer({ port: "8080" });
 let lastPlayerInput = {};
+let lastEnemyMove = -1;
 
 let board = new Board(20, 15);
 
@@ -28,11 +31,16 @@ let display = () => {
   }
 }
 
-board.addEnemies(3)
+board.addEnemies(1)
 
 // Update all clients with the current state of the board
 setInterval(() => {
-  board.moveEnemies();
+  lastTick += 1;
+  if (lastTick % 2 === 0) {
+    lastEnemyMove += 1;
+    board.moveEnemies();
+  }
+
   const playerPositions = board.exportPlayerPositions().map(playerString => {
     const id = playerString.split('-')[0];
     const position = playerString.split('-')[1];
@@ -40,7 +48,9 @@ setInterval(() => {
   }).join("|");
 
   const enemyPositions = board.exportEnemyPositions().map(enemyString => {
-    return enemyString;
+    const id = enemyString.split('-')[0];
+    const position = enemyString.split('-')[1];
+    return `${id}-${lastEnemyMove}-${position}`;
   }).join("|");    
 
   const timestamp = Date.now();

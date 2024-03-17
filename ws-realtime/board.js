@@ -142,7 +142,7 @@ export class Board {
     for (let id in this.idMap) {
       if (typeof this.idMap[id] === 'object' && this.idMap[id] !== null) {
         const enemy = this.idMap[id];
-        const positionString = `${id}-${enemy.direction}-${enemy.j}·${enemy.i}`;
+        const positionString = `${id}-${enemy.j}·${enemy.i}`;
         enemyPositions.push(positionString);
       }
     }

@@ -15,9 +15,9 @@ var walk_inv = false
 
 var tile_pos = Vector2i.ZERO
 var tile_pos_pxls = Vector2.ZERO
-var tile_pos_inps_cln = {} # Buffer
-var tile_pos_inps_srv = {} # Buffer
-var tile_pos_inps_srv_ftr = {}
+var cln_inpt_pos = {} # Buffer
+var srv_inpt_pos = {} # Buffer
+var srv_inpt_pos_ftr = {}
 
 var last_recon_input = -1
 var needs_correction
@@ -37,16 +37,16 @@ func _physics_process(delta):
 	if owner_ == 'local':
 		if not processing_move:
 			reconciliate_pos()
-			process_input_cln()
+			process_cln_inpt()
 		elif processing_move:
 			if tile_completed:
 				tile_completed = false
-				store_and_send_position()
+				store_and_send_pos()
 			else: # ? This else seems important to reduce lag
 				move(delta)
 	elif owner_ == 'remote':
 		if not processing_move:
-			process_input_srv()
+			process_srv_inpt()
 		elif processing_move:
 			move(delta)
 
@@ -60,7 +60,7 @@ func set_starting_foot():
 		just_stop = true
 		walk_inv = not walk_inv
 
-func process_input_cln():
+func process_cln_inpt():
 	if direction.y == 0:
 		direction.x = int(Input.is_action_pressed('ui_right')) - int(Input.is_action_pressed('ui_left'))
 	if direction.x == 0:
@@ -75,25 +75,25 @@ func process_input_cln():
 		anim_state.travel('Idle')
 		set_starting_foot()
 
-func process_input_srv():
+func process_srv_inpt():
 	# If a new input arrives while player is still moving, it will not be processed
 	# In that case, input buffer will contain at least 2 inputs: current one and next one
 	# It can contain: 0, 1 or 2 inputs (maybe more if lag is too high)
 
 	var keep_moving
-	if not tile_pos_inps_srv.is_empty():
-		var input_2nd = tile_pos_inps_srv.keys()[-1]
-		var tile_pos_srv_2nd = tile_pos_inps_srv[input_2nd]
-		direction = tile_pos_srv_2nd - tile_pos
+	if not srv_inpt_pos.is_empty():
+		var inpt_2nd = srv_inpt_pos.keys()[-1]
+		var srv_pos_2nd = srv_inpt_pos[inpt_2nd]
+		direction = srv_pos_2nd - tile_pos
 
-		var input_1st = tile_pos_inps_srv.keys()[0]
-		var tile_pos_srv_1st = tile_pos_inps_srv[input_1st]
-		var input_ftr = tile_pos_inps_srv_ftr.keys()[-1]
-		var tile_pos_srv_ftr = tile_pos_inps_srv_ftr[input_ftr]
-		keep_moving = true if tile_pos_srv_ftr - tile_pos_srv_1st != Vector2.ZERO else false
+		var inpt_1st = srv_inpt_pos.keys()[0]
+		var srv_pos_1st = srv_inpt_pos[inpt_1st]
+		var input_ftr = srv_inpt_pos_ftr.keys()[-1]
+		var srv_pos_ftr = srv_inpt_pos_ftr[input_ftr]
+		keep_moving = true if srv_pos_ftr - srv_pos_1st != Vector2.ZERO else false
 
-		tile_pos_inps_srv = {}
-		tile_pos_inps_srv_ftr = {}
+		srv_inpt_pos = {}
+		srv_inpt_pos_ftr = {}
 
 	if direction != Vector2.ZERO:
 		tile_pos_pxls = position
@@ -128,28 +128,28 @@ func move(delta):
 		processing_move = false
 		tile_completed = true
 
-		var last_key = tile_pos_inps_cln.keys()[- 1]
-		tile_pos_inps_cln[last_key] = tile_pos
+		var last_key = cln_inpt_pos.keys()[- 1]
+		cln_inpt_pos[last_key] = tile_pos
 		if Config.DEBUG_POS:
-			print(client_id, ' Corrected (client): ', tile_pos_inps_cln)
+			print(client_id, ' Corrected (client): ', cln_inpt_pos)
 
-func store_and_send_position():
+func store_and_send_pos():
 	# n = 0 is spawn position
 	var n
 	# No more inputs to reconcile
-	if tile_pos_inps_cln.is_empty():
+	if cln_inpt_pos.is_empty():
 		n = last_recon_input + 1
 	# There are still inputs to reconcile
 	else:
-		var last_key = tile_pos_inps_cln.keys()[- 1]
+		var last_key = cln_inpt_pos.keys()[- 1]
 		n = last_key + 1
 
 	var new_tile_pos = tile_pos + direction
 	
-	tile_pos_inps_cln[n] = new_tile_pos
+	cln_inpt_pos[n] = new_tile_pos
 	socket.send_text('p' + str(n) + '-' + str(new_tile_pos.x) + '·' + str(new_tile_pos.y))
 	if Config.DEBUG_POS:
-		print(client_id, ' Sent: ', tile_pos_inps_cln)
+		print(client_id, ' Sent: ', cln_inpt_pos)
 
 func will_collide(target_dir):
 	ray.target_position = target_dir * Config.TILE_SIZE / 2
@@ -160,15 +160,15 @@ func will_collide(target_dir):
 
 func reconciliate_pos():
 	var inputs_to_erase = []
-	for input in tile_pos_inps_srv:
+	for input in srv_inpt_pos:
 		if input > last_recon_input:
 			last_recon_input = input
-			if tile_pos_inps_cln.has(input) and tile_pos_inps_cln[input] != tile_pos_inps_srv[input]:
+			if cln_inpt_pos.has(input) and cln_inpt_pos[input] != srv_inpt_pos[input]:
 				# Tile correction
-				position = tile_pos_inps_srv[input] * Config.TILE_SIZE
-				tile_pos = tile_pos_inps_srv[input]
+				position = srv_inpt_pos[input] * Config.TILE_SIZE
+				tile_pos = srv_inpt_pos[input]
 				if Config.DEBUG_POS:
-					print(client_id, ' Corrected (server): ', {input: tile_pos_inps_srv[input]})
+					print(client_id, ' Corrected (server): ', {input: srv_inpt_pos[input]})
 			if Config.DEBUG_POS:
 				print(client_id, ' Reconciled: ', input)
 		inputs_to_erase.append(input)
@@ -176,8 +176,8 @@ func reconciliate_pos():
 	#? This can probably be optimized using a while loop
 	if not inputs_to_erase.is_empty():
 		#? Why is this necessary?
-		tile_pos_inps_cln = tile_pos_inps_cln.duplicate()
+		cln_inpt_pos = cln_inpt_pos.duplicate()
 
 		for input in inputs_to_erase:
-			tile_pos_inps_cln.erase(input)
-			tile_pos_inps_srv.erase(input)
+			cln_inpt_pos.erase(input)
+			srv_inpt_pos.erase(input)
